@@ -47,7 +47,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^3.0.0
   get: ^4.7.2
-  dio: ^5.7.0
+  http: ^1.4.0
+  fluttertoast: ^8.2.12
+
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

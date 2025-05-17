@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'dart:io';
+import 'package:http/http.dart' as http;
 
 class SearchScreenController extends GetxController {
   final TextEditingController searchController = TextEditingController();
@@ -17,6 +17,9 @@ class SearchScreenController extends GetxController {
 
   void updateSearchQuery() {
     searchQuery = searchController.text;
+    if (searchQuery.trim().isEmpty) {
+      return; // Don't search if empty
+    }
     performSearch();
     FocusManager.instance.primaryFocus?.unfocus();
   }
@@ -59,20 +62,19 @@ class SearchScreenController extends GetxController {
 
     isSearching.value = false;
     update(); // Update UI state
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   Future<void> fetchSuggestions(String query) async {
     try {
-      HttpClient client = HttpClient()
-        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
       final encodedQuery = Uri.encodeComponent(query);
-      final url = 'https://smart-words.vercel.app/api/suggestions?q=$encodedQuery';
-      final request = await client.getUrl(Uri.parse(url));
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final url = Uri.parse('https://smart-words.vercel.app/api/suggestions?q=$encodedQuery');
+
+      // Using http package to make the API call
+      final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(responseBody);
+        final Map<String, dynamic> data = json.decode(response.body);
         originalSuggestions = data.containsKey('originalSuggestions') && data['originalSuggestions'] is List
             ? List<String>.from(data['originalSuggestions'])
             : [];
@@ -108,6 +110,13 @@ class SearchScreenController extends GetxController {
       colorText: Colors.white,
       duration: const Duration(seconds: 1),
     );
+  }
+
+  bool hasResults() {
+    return originalSuggestions.isNotEmpty ||
+        alphabetVariations.isNotEmpty ||
+        questions.isNotEmpty ||
+        commonPhrases.isNotEmpty;
   }
 
   @override

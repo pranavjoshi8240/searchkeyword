@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:searchkeyword/View/SearchScreen/search_screen_controller.dart';
 import 'package:searchkeyword/utils/app_strings.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class SearchScreenView extends GetView<SearchScreenController> {
   static const String routeName = "/homeScreen";
@@ -64,9 +65,13 @@ class SearchScreenView extends GetView<SearchScreenController> {
                         child: TextField(
                           controller: controller.searchController,
                           onChanged: (value) {
-                            if (value.isEmpty) {
+                            // Just clear the results but keep the text
+                            if (value.isEmpty && controller.hasSearched) {
                               controller.clearData();
                             }
+                          },
+                          onSubmitted: (value) {
+                            controller.updateSearchQuery();
                           },
                           decoration: const InputDecoration(
                             hintText: AppStrings.searchHint,
@@ -74,35 +79,71 @@ class SearchScreenView extends GetView<SearchScreenController> {
                             contentPadding: EdgeInsets.symmetric(vertical: 15),
                           ),
                           style: const TextStyle(fontSize: 16),
+                          textInputAction: TextInputAction.search,
                         ),
                       ),
-                      Obx(()=>InkWell(
-                        onTap: controller.updateSearchQuery,
-                        child: Container(
-                          height: 45,
-                          width: 100,
-                          margin: const EdgeInsets.only(right: 5),
-                          decoration: BoxDecoration(
-                              color: Colors.black,
-                              borderRadius: BorderRadius.circular(30)
-                          ),
-                          child: controller.isSearching.value ?
-                          const Center(
-                            child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 35,vertical: 10),
-                                child: CircularProgressIndicator(color: Colors.white)),
-                          ) :
-                          const Center(
-                            child: Text(
-                              AppStrings.searchButtonText,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                      GetBuilder<SearchScreenController>(
+                        builder: (_) => GestureDetector(
+                          onTap: () {
+                            if (controller.isSearching.value) {
+                              // Do nothing if already searching
+                              return;
+                            }
+
+                            if (controller.hasResults()) {
+                              // Clear data and text field
+                              controller.searchController.clear();
+                              controller.clearData();
+                            } else if (controller.searchController.text.trim().isNotEmpty) {
+                              // Perform search if text field is not empty
+                              controller.updateSearchQuery();
+                            } else {
+                              Fluttertoast.showToast(
+                                  msg: "Enter text in above field",
+                                  toastLength: Toast.LENGTH_SHORT,
+                                  gravity: ToastGravity.BOTTOM,
+                                  timeInSecForIosWeb: 1,
+                                  backgroundColor: Colors.green,
+                                  textColor: Colors.white,
+                                  fontSize: 16.0
+                              );
+                            }
+                          },
+                          child: Container(
+                            height: 45,
+                            width: 100,
+                            margin: const EdgeInsets.only(right: 5),
+                            decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(30)
+                            ),
+                            child: Obx(() => controller.isSearching.value ?
+                            // Loading state
+                            const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
                               ),
+                            ) :
+                            // Show "Clear" only when we have results, otherwise show "Search"
+                            Center(
+                              child: Text(
+                                controller.hasResults()
+                                    ? AppStrings.clearButtonText
+                                    : AppStrings.searchButtonText,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                             ),
                           ),
                         ),
-                      ),
                       ),
                     ],
                   ),
@@ -114,11 +155,7 @@ class SearchScreenView extends GetView<SearchScreenController> {
                   builder: (_) {
                     if (controller.isSearching.value) {
                       return const Center(child: CircularProgressIndicator(color: Colors.white));
-                    } else if (controller.hasSearched &&
-                        controller.originalSuggestions.isEmpty &&
-                        controller.alphabetVariations.isEmpty &&
-                        controller.questions.isEmpty &&
-                        controller.commonPhrases.isEmpty) {
+                    } else if (controller.hasSearched && !controller.hasResults()) {
                       return const Center(
                         child: Text(
                           AppStrings.noResultsFound,
@@ -200,18 +237,21 @@ class SearchScreenView extends GetView<SearchScreenController> {
               physics: const ClampingScrollPhysics(),
               itemCount: suggestions.length,
               itemBuilder: (context, index) {
-                return Container(
-                  height: 40,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 10,vertical: 8),
-                  decoration: BoxDecoration(
-                      color: const Color(0xFF222530),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF30354A), width: 1)
-                  ),
-                  child: Text(
-                    suggestions[index],
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                return InkWell(
+                  onTap: () => controller.selectResult(suggestions[index]),
+                  child: Container(
+                    height: 40,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF222530),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF30354A), width: 1)
+                    ),
+                    child: Text(
+                      suggestions[index],
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
                   ),
                 );
               },
